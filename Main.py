@@ -23,7 +23,7 @@ args = vars(ap.parse_args())
 
 # initialize the video stream and allow the cammera sensor to warmup
 vs = VideoStream(usePiCamera=args["picamera"] > 0).start()
-time.sleep(2.0)
+time.sleep(50.0)
 
 # loop over the frames from the video stream
 while True:
@@ -62,6 +62,7 @@ while True:
         if cv2.contourArea(c) < 100:
             continue
         
+        # compute the shape of object
         shape = sd.detect(c)
         
         # compute the rotated bounding box of the contour
@@ -119,7 +120,25 @@ while True:
         dimA = dA / pixelsPerMetric
         dimB = dB / pixelsPerMetric
         
-        # TO-DO check pizza size and make action
+        # get and compute the area of the object
+        pixelsArea = cv2.contourArea(c)
+        pizzaArea = pixelsArea / pow(pixelsPerMetric, 2)
+                
+        if abs(dimA - dimB) <= 2:
+            if shape == "circulo":
+                if dimA >= 14 and dimB >= 14 and dimA < 18 and dimB < 18 and pizzaArea >= 153.938 and pizzaArea < 254.469:
+                    pizza = "Pequena"
+                elif dimA >= 18 and dimB >= 18 and dimA < 23 and dimB < 23 and pizzaArea >= 254.469 and pizzaArea < 415.476:
+                    pizza = "Media"
+                elif dimA >= 23 and dimB >= 23 and dimA < 29 and dimB < 29 and pizzaArea >= 415.476 and pizzaArea < 660.52:
+                    pizza = "Grande"
+                else: 
+                    pizza = "Descartar"
+            else:
+                pizza = "Descartar"
+        else:
+            pizza = "Descartar"
+        
         
         # draw the object sizes on the image
         cv2.putText(orig, "{:.1f}cm".format(dimA),
@@ -129,8 +148,11 @@ while True:
             (int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
             0.65, (255, 255, 255), 2)
         # write size off pizza
-        cv2.putText(orig, shape,
-            (int(trbrX - 50), int(trbrY + 60)), cv2.FONT_HERSHEY_SIMPLEX,
+        cv2.putText(orig, pizza,
+            (int(trbrX - 50), int(trbrY + 150)), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, (255, 255, 255), 2)
+        cv2.putText(orig, str(pizzaArea),
+            (int(trbrX - 200), int(trbrY + 200)), cv2.FONT_HERSHEY_SIMPLEX,
             0.65, (255, 255, 255), 2)
         
         
