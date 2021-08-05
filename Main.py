@@ -1,5 +1,6 @@
 # import the necessary packages
 from imutils.video import VideoStream
+from libs.shapedetector import ShapeDetector
 from scipy.spatial import distance as dist
 from imutils import perspective
 from imutils import contours
@@ -40,6 +41,8 @@ while True:
     edged = cv2.dilate(edged, None, iterations=1)
     edged = cv2.erode(edged, None, iterations=1)
 
+    sd = ShapeDetector()
+    
     # find contours in the edge map
     cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL,
         cv2.CHAIN_APPROX_SIMPLE)
@@ -58,6 +61,8 @@ while True:
         # if the contour is not sufficiently large, ignore it
         if cv2.contourArea(c) < 100:
             continue
+        
+        shape = sd.detect(c)
         
         # compute the rotated bounding box of the contour
         orig = image.copy()
@@ -124,9 +129,10 @@ while True:
             (int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
             0.65, (255, 255, 255), 2)
         # write size off pizza
-        cv2.putText(orig, "PEQ".format(dimA),
+        cv2.putText(orig, shape,
             (int(trbrX - 50), int(trbrY + 60)), cv2.FONT_HERSHEY_SIMPLEX,
             0.65, (255, 255, 255), 2)
+        
         
     # show the output image
     cv2.imshow("Image", orig)
