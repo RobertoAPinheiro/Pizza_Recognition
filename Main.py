@@ -9,11 +9,23 @@ import numpy as np
 import argparse
 import imutils
 import time
+import math
 import cv2
 
 def midpoint(ptA, ptB):
     return ((ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5)
 
+def comparePerimeter(dA, dB, c):
+    dMed = (dA + dB)/2
+    realPerimeter = cv2.arcLength(c, True)
+    perfectPerimeter = 2 * math.pi * dMed/2
+    print(realPerimeter)
+    print(perfectPerimeter)
+    print("----")
+    percentError = abs(((realPerimeter / perfectPerimeter) * 100) - 100)
+    return percentError
+    
+    
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-w", "--width", type=float, required=True,
@@ -59,7 +71,7 @@ while True:
 
     # loop over the contours individually
     for c in cnts:
-        c = cnts[1]
+
         # if the contour is not sufficiently large, ignore it
         if cv2.contourArea(c) < 100:
             continue
@@ -82,8 +94,8 @@ while True:
         
         
         # loop over the original points and draw them
-        for (x, y) in box:
-            cv2.circle(orig, (int(x), int(y)), 5, (0, 0, 255), -1)
+        #for (x, y) in box:
+            #cv2.circle(orig, (int(x), int(y)), 5, (0, 0, 255), -1)
             
         # unpack the ordered bounding box, then compute the midpoint
         # between the top-left and top-right coordinates, followed by
@@ -123,12 +135,13 @@ while True:
         dimA = dA / pixelsPerMetric
         dimB = dB / pixelsPerMetric
         
-        # find avg diameter and center of equivalent circle from contour and draw        
-        dMed = (dA + dB)/2
-        moment = cv2.moments(c)
-        cx = int(moment['m10']/moment['m00'])
-        cy = int(moment['m01']/moment['m00'])
-        refCircle = cv2.circle(orig, [cx, cy], int(dMed/2), (255, 0, 0), 2).ravel()        
+        # find avg diameter and perimeter of equivalent circle from contour and compare        
+        perimeterError = int(comparePerimeter(dA, dB, c))
+        #moment = cv2.moments(c)
+        #cx = int(moment['m10']/moment['m00'])
+        #cy = int(moment['m01']/moment['m00'])
+        #refCircle = cv2.circle(orig, [cx, cy], int(dMed/2), (255, 0, 0), 2).ravel()
+        #compShapes = cv2.matchShapes(c, refCircle, 1, 0.0)
         
         # get and compute the area of the object
         pixelsArea = cv2.contourArea(c)
@@ -136,12 +149,24 @@ while True:
                 
         if abs(dimA - dimB) <= 2:
             if shape == "circulo":
-                if dimA >= 14 and dimB >= 14 and dimA < 18 and dimB < 18 and pizzaArea >= 153.938 and pizzaArea < 254.469:
-                    pizza = "Pequena"
-                elif dimA >= 18 and dimB >= 18 and dimA < 23 and dimB < 23 and pizzaArea >= 254.469 and pizzaArea < 415.476:
-                    pizza = "Media"
-                elif dimA >= 23 and dimB >= 23 and dimA < 29 and dimB < 29 and pizzaArea >= 415.476 and pizzaArea < 660.52:
-                    pizza = "Grande"
+                if perimeterError <= 9:
+                    if dimA >= 14 and dimB >= 14 and dimA < 18 and dimB < 18:
+                        if pizzaArea >= 153.938 and pizzaArea < 254.469:
+                            pizza = "Pequena"
+                        else: 
+                            pizza = "Descartar"
+                    elif dimA >= 18 and dimB >= 18 and dimA < 23 and dimB < 23:
+                        if(pizzaArea >= 254.469 and pizzaArea < 415.476):
+                            pizza = "Media"
+                        else: 
+                            pizza = "Descartar"
+                    elif dimA >= 23 and dimB >= 23 and dimA < 29 and dimB < 29:
+                        if pizzaArea >= 415.476 and pizzaArea < 660.52:
+                            pizza = "Grande"
+                        else: 
+                            pizza = "Descartar"
+                    else: 
+                        pizza = "Descartar"
                 else: 
                     pizza = "Descartar"
             else:
@@ -160,7 +185,7 @@ while True:
         # write size off pizza
         cv2.putText(orig, pizza,
             (int(trbrX - 50), int(trbrY + 150)), cv2.FONT_HERSHEY_SIMPLEX,
-            0.65, (255, 255, 255), 2)
+            0.65, (255, 0, 255), 2)
         cv2.putText(orig, str(pizzaArea),
             (int(trbrX - 200), int(trbrY + 200)), cv2.FONT_HERSHEY_SIMPLEX,
             0.65, (255, 255, 255), 2)
