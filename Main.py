@@ -2,6 +2,7 @@
 from imutils.video import VideoStream
 from libs.shapedetector import ShapeDetector
 from scipy.spatial import distance as dist
+from skimage import measure
 from imutils import perspective
 from imutils import contours
 import numpy as np
@@ -23,7 +24,7 @@ args = vars(ap.parse_args())
 
 # initialize the video stream and allow the cammera sensor to warmup
 vs = VideoStream(usePiCamera=args["picamera"] > 0).start()
-time.sleep(50.0)
+time.sleep(5.0)
 
 # loop over the frames from the video stream
 while True:
@@ -58,6 +59,7 @@ while True:
 
     # loop over the contours individually
     for c in cnts:
+        c = cnts[1]
         # if the contour is not sufficiently large, ignore it
         if cv2.contourArea(c) < 100:
             continue
@@ -74,9 +76,10 @@ while True:
         # order the points in the contour such that they appear
         # in top-left, top-right, bottom-right, and bottom-left
         # order, then draw the outline of the rotated bounding
-        # box
+        # box:     box.astype("int")
         box = perspective.order_points(box)
-        cv2.drawContours(orig, [box.astype("int")], -1, (0, 255, 0), 2)
+        cv2.drawContours(orig, [c], -1, (0, 255, 0), 2)
+        
         
         # loop over the original points and draw them
         for (x, y) in box:
@@ -95,10 +98,10 @@ while True:
         (trbrX, trbrY) = midpoint(tr, br)
         
         # draw the midpoints on the image
-        cv2.circle(orig, (int(tltrX), int(tltrY)), 5, (255, 0, 0), -1)
-        cv2.circle(orig, (int(blbrX), int(blbrY)), 5, (255, 0, 0), -1)
-        cv2.circle(orig, (int(tlblX), int(tlblY)), 5, (255, 0, 0), -1)
-        cv2.circle(orig, (int(trbrX), int(trbrY)), 5, (255, 0, 0), -1)
+#         cv2.circle(orig, (int(tltrX), int(tltrY)), 5, (255, 0, 0), -1)
+#         cv2.circle(orig, (int(blbrX), int(blbrY)), 5, (255, 0, 0), -1)
+#         cv2.circle(orig, (int(tlblX), int(tlblY)), 5, (255, 0, 0), -1)
+#         cv2.circle(orig, (int(trbrX), int(trbrY)), 5, (255, 0, 0), -1)
         
         # draw lines between the midpoints
         cv2.line(orig, (int(tltrX), int(tltrY)), (int(blbrX), int(blbrY)),
@@ -119,6 +122,13 @@ while True:
         # compute the size of the object
         dimA = dA / pixelsPerMetric
         dimB = dB / pixelsPerMetric
+        
+        # find avg diameter and center of equivalent circle from contour and draw        
+        dMed = (dA + dB)/2
+        moment = cv2.moments(c)
+        cx = int(moment['m10']/moment['m00'])
+        cy = int(moment['m01']/moment['m00'])
+        refCircle = cv2.circle(orig, [cx, cy], int(dMed/2), (255, 0, 0), 2).ravel()        
         
         # get and compute the area of the object
         pixelsArea = cv2.contourArea(c)
