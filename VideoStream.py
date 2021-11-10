@@ -3,7 +3,7 @@ from webcamvideostream import WebcamVideoStream
 
 class VideoStream:
 	def __init__(self, src=0, usePiCamera=False, resolution=(320, 240),
-		framerate=32):
+		framerate=15):
 		# check to see if the picamera module should be used
 		if usePiCamera:
 			# only import the picamera packages unless we are

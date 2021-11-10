@@ -11,6 +11,21 @@ import imutils
 import time
 import math
 import cv2
+import zmq
+
+
+#  Socket to talk to server
+print("Connecting to TCP server…")
+context = zmq.Context()
+socket = context.socket(zmq.REQ)
+socket.connect("tcp://localhost:5555")
+print("CONNECTED")
+
+pizzaSizeNum = 0
+lastPizzaSizeNum = 0
+# initialize the 'pixels per metric' calibration variable
+pixelsPerMetric = None
+cntNoPizza = 0
 
 def midpoint(ptA, ptB):
     return ((ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5)
@@ -19,9 +34,9 @@ def comparePerimeter(dA, dB, c):
     dMed = (dA + dB)/2
     realPerimeter = cv2.arcLength(c, True)
     perfectPerimeter = 2 * math.pi * dMed/2
-    print(realPerimeter)
-    print(perfectPerimeter)
-    print("----")
+    #print(realPerimeter)
+    #print(perfectPerimeter)
+    #print("----")
     percentError = abs(((realPerimeter / perfectPerimeter) * 100) - 100)
     return percentError
     
@@ -61,18 +76,32 @@ while True:
         cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
 
-    # sort the contours from left-to-right and initialize the
-    # 'pixels per metric' calibration variable
+    # sort the contours from left-to-right    
     if(cnts):
         (cnts, _) = contours.sort_contours(cnts)
-    pixelsPerMetric = None
     
     orig = image.copy()
+    
+    # Send to socket there is no pizza on image
+    if(len(cnts) <= 2):
+        if(cntNoPizza >= 350):
+            cntNoPizza = 0
+            pizzaSizeNum = 4
+            if(lastPizzaSizeNum != pizzaSizeNum):
+                socket.send_string(str(pizzaSizeNum))
+                socket.recv()
+                print("Send request: %s" % pizzaSizeNum)
+                lastPizzaSizeNum = pizzaSizeNum
+        else:
+            cntNoPizza = cntNoPizza + 1
+    else:
+        cntNoPizza = 0
 
     # loop over the contours individually
     for c in cnts:
 
         # if the contour is not sufficiently large, ignore it
+        
         if cv2.contourArea(c) < 100:
             continue
         
@@ -146,6 +175,7 @@ while True:
         # get and compute the area of the object
         pixelsArea = cv2.contourArea(c)
         pizzaArea = pixelsArea / pow(pixelsPerMetric, 2)
+        
                 
         if abs(dimA - dimB) <= 2:
             if shape == "circulo":
@@ -153,26 +183,45 @@ while True:
                     if dimA >= 14 and dimB >= 14 and dimA < 18 and dimB < 18:
                         if pizzaArea >= 153.938 and pizzaArea < 254.469:
                             pizza = "Pequena"
+                            pizzaSizeNum = 1
                         else: 
                             pizza = "Descartar"
+                            pizzaSizeNum = 0
                     elif dimA >= 18 and dimB >= 18 and dimA < 23 and dimB < 23:
                         if(pizzaArea >= 254.469 and pizzaArea < 415.476):
                             pizza = "Media"
+                            pizzaSizeNum = 2
                         else: 
                             pizza = "Descartar"
+                            pizzaSizeNum = 0
                     elif dimA >= 23 and dimB >= 23 and dimA < 29 and dimB < 29:
                         if pizzaArea >= 415.476 and pizzaArea < 660.52:
                             pizza = "Grande"
+                            pizzaSizeNum = 3
                         else: 
                             pizza = "Descartar"
+                            pizzaSizeNum = 0
                     else: 
                         pizza = "Descartar"
+                        pizzaSizeNum = 0
                 else: 
                     pizza = "Descartar"
+                    pizzaSizeNum = 0
             else:
                 pizza = "Descartar"
+                pizzaSizeNum = 0
         else:
             pizza = "Descartar"
+            pizzaSizeNum = 0
+            
+
+        #  Send reply back to client
+        if(lastPizzaSizeNum != pizzaSizeNum):
+            socket.send_string(str(pizzaSizeNum))
+            socket.recv()
+            print("Send request: %s" % pizzaSizeNum)
+            lastPizzaSizeNum = pizzaSizeNum
+        
         
         
         # draw the object sizes on the image
