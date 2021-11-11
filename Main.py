@@ -13,6 +13,7 @@ import math
 import cv2
 import zmq
 
+ERROR_MAX = 9
 
 #  Socket to talk to server
 print("Connecting to TCP server…")
@@ -34,19 +35,34 @@ def comparePerimeter(dA, dB, c):
     dMed = (dA + dB)/2
     realPerimeter = cv2.arcLength(c, True)
     perfectPerimeter = 2 * math.pi * dMed/2
-    #print(realPerimeter)
-    #print(perfectPerimeter)
-    #print("----")
     percentError = abs(((realPerimeter / perfectPerimeter) * 100) - 100)
     return percentError
     
+def compareDiameter(dA, dB):
+    dCompA = abs(dA - dB)/dA
+    dCompB = abs(dA - dB)/dB
+    if(dCompA > dCompB): 
+        return dCompA * 100
+    else: 
+        return dCompB * 100
+        
+def comparePattern(dA, dB, dS):
+    dMed = (dA + dB)/2
+    percentError = abs((dMed/dS)-1) * 100
+    return percentError
+
+def compareArea(pizzaArea, dS):
+    defaultArea = math.pi*(pow(dS,2)/4)
+    percentError = abs((pizzaArea/defaultArea)-1) * 100
+    return percentError   
     
+
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-w", "--width", type=float, required=True,
     help="width of the left-most object in the image (in inches)")
 ap.add_argument("-p", "--picamera", type=int, default=-1,
-	help="whether or not the Raspberry Pi camera should be used")
+    help="whether or not the Raspberry Pi camera should be used")
 args = vars(ap.parse_args())
 
 # initialize the video stream and allow the cammera sensor to warmup
@@ -139,10 +155,10 @@ while True:
         (trbrX, trbrY) = midpoint(tr, br)
         
         # draw the midpoints on the image
-#         cv2.circle(orig, (int(tltrX), int(tltrY)), 5, (255, 0, 0), -1)
-#         cv2.circle(orig, (int(blbrX), int(blbrY)), 5, (255, 0, 0), -1)
-#         cv2.circle(orig, (int(tlblX), int(tlblY)), 5, (255, 0, 0), -1)
-#         cv2.circle(orig, (int(trbrX), int(trbrY)), 5, (255, 0, 0), -1)
+        #cv2.circle(orig, (int(tltrX), int(tltrY)), 5, (255, 0, 0), -1)
+        #cv2.circle(orig, (int(blbrX), int(blbrY)), 5, (255, 0, 0), -1)
+        #cv2.circle(orig, (int(tlblX), int(tlblY)), 5, (255, 0, 0), -1)
+        #cv2.circle(orig, (int(trbrX), int(trbrY)), 5, (255, 0, 0), -1)
         
         # draw lines between the midpoints
         cv2.line(orig, (int(tltrX), int(tltrY)), (int(blbrX), int(blbrY)),
@@ -151,8 +167,11 @@ while True:
             (255, 0, 255), 2)
             
         # compute the Euclidean distance between the midpoints
-        dA = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
-        dB = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
+        #dA = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
+        #dB = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
+        
+        dA = dist.euclidean(tl,tr)
+        dB = dist.euclidean(tl,bl)
         
         # if the pixels per metric has not been initialized, then
         # compute it as the ratio of pixels to supplied metric
@@ -164,8 +183,7 @@ while True:
         dimA = dA / pixelsPerMetric
         dimB = dB / pixelsPerMetric
         
-        # find avg diameter and perimeter of equivalent circle from contour and compare        
-        perimeterError = int(comparePerimeter(dA, dB, c))
+        
         #moment = cv2.moments(c)
         #cx = int(moment['m10']/moment['m00'])
         #cy = int(moment['m01']/moment['m00'])
@@ -176,26 +194,29 @@ while True:
         pixelsArea = cv2.contourArea(c)
         pizzaArea = pixelsArea / pow(pixelsPerMetric, 2)
         
-                
-        if abs(dimA - dimB) <= 2:
-            if shape == "circulo":
-                if perimeterError <= 9:
-                    if dimA >= 14 and dimB >= 14 and dimA < 18 and dimB < 18:
-                        if pizzaArea >= 153.938 and pizzaArea < 254.469:
+        
+        
+        if shape == "Arredondado":  #Trocar de circular para Arredondado
+            # compare diameters for prevent a oval shape
+            if int(compareDiameter(dA, dB)) <= ERROR_MAX:
+                # find avg diameter and perimeter of equivalent circle from contour and compare    
+                if int(comparePerimeter(dA, dB, c)) <= ERROR_MAX:
+                    if (comparePattern(dimA, dimB, 16) <= ERROR_MAX): # Diametro Pizza Pequena 16
+                        if (compareArea(pizzaArea, 16) <= ERROR_MAX):
                             pizza = "Pequena"
                             pizzaSizeNum = 1
                         else: 
                             pizza = "Descartar"
                             pizzaSizeNum = 0
-                    elif dimA >= 18 and dimB >= 18 and dimA < 23 and dimB < 23:
-                        if(pizzaArea >= 254.469 and pizzaArea < 415.476):
+                    elif (comparePattern(dimA, dimB, 19.5) <= ERROR_MAX): # Diametro Pizza Média 19.5
+                        if(compareArea(pizzaArea, 19.5) <= ERROR_MAX):
                             pizza = "Media"
                             pizzaSizeNum = 2
                         else: 
                             pizza = "Descartar"
                             pizzaSizeNum = 0
-                    elif dimA >= 23 and dimB >= 23 and dimA < 29 and dimB < 29:
-                        if pizzaArea >= 415.476 and pizzaArea < 660.52:
+                    elif (comparePattern(dimA, dimB, 26) <= ERROR_MAX): # Diametro Pizza Grande 26
+                        if (compareArea(pizzaArea, 26) <= ERROR_MAX):
                             pizza = "Grande"
                             pizzaSizeNum = 3
                         else: 
@@ -225,19 +246,19 @@ while True:
         
         
         # draw the object sizes on the image
-        cv2.putText(orig, "{:.1f}cm".format(dimA),
-            (int(tltrX - 15), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX,
-            0.65, (255, 255, 255), 2)
-        cv2.putText(orig, "{:.1f}cm".format(dimB),
-            (int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
-            0.65, (255, 255, 255), 2)
+        #cv2.putText(orig, "{:.1f}cm".format(dimA),
+        #    (int(tltrX - 15), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX,
+        #    0.65, (255, 255, 255), 2)
+        #cv2.putText(orig, "{:.1f}cm".format(dimB),
+        #    (int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
+        #    0.65, (255, 255, 255), 2)
         # write size off pizza
-        cv2.putText(orig, pizza,
-            (int(trbrX - 50), int(trbrY + 150)), cv2.FONT_HERSHEY_SIMPLEX,
-            0.65, (255, 0, 255), 2)
-        cv2.putText(orig, str(pizzaArea),
-            (int(trbrX - 200), int(trbrY + 200)), cv2.FONT_HERSHEY_SIMPLEX,
-            0.65, (255, 255, 255), 2)
+        #cv2.putText(orig, pizza,
+        #    (int(trbrX - 50), int(trbrY + 150)), cv2.FONT_HERSHEY_SIMPLEX,
+        #    0.65, (255, 0, 255), 2)
+        #cv2.putText(orig, str(pizzaArea),
+        #    (int(trbrX - 200), int(trbrY + 200)), cv2.FONT_HERSHEY_SIMPLEX,
+        #    0.65, (255, 255, 255), 2)
         
         
     # show the output image
@@ -249,3 +270,4 @@ while True:
 # do a bit of cleanup
 cv2.destroyAllWindows()
 vs.stop()
+ 

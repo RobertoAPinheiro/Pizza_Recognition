@@ -27,7 +27,7 @@ class ShapeDetector:
             shape = "pentagono"
         # otherwise, we assume the shape is a circle
         elif len(approx) >= 7:
-            shape = "circulo"
+            shape = "Arredondado"
         else:
             shape = "unidentified"
             
