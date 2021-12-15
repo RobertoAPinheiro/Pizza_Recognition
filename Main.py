@@ -1,3 +1,5 @@
+# coding=utf-8
+
 # import the necessary packages
 from imutils.video import VideoStream
 from libs.shapedetector import ShapeDetector
@@ -16,7 +18,7 @@ import zmq
 ERROR_MAX = 9
 
 #  Socket to talk to server
-print("Connecting to TCP server…")
+#print("Connecting to TCP server…")
 context = zmq.Context()
 socket = context.socket(zmq.REQ)
 socket.connect("tcp://localhost:5555")
@@ -25,7 +27,7 @@ print("CONNECTED")
 pizzaSizeNum = 0
 lastPizzaSizeNum = 0
 # initialize the 'pixels per metric' calibration variable
-pixelsPerMetric = None
+pixelsPerMetric = 6.5
 cntNoPizza = 0
 
 def midpoint(ptA, ptB):
@@ -100,7 +102,7 @@ while True:
     
     # Send to socket there is no pizza on image
     if(len(cnts) <= 2):
-        if(cntNoPizza >= 350):
+        if(cntNoPizza >= 700):
             cntNoPizza = 0
             pizzaSizeNum = 4
             if(lastPizzaSizeNum != pizzaSizeNum):
@@ -176,9 +178,9 @@ while True:
         # if the pixels per metric has not been initialized, then
         # compute it as the ratio of pixels to supplied metric
         # (in this case, inches)
-        if pixelsPerMetric is None:
-            pixelsPerMetric = dB / args["width"]
-            
+        #if pixelsPerMetric is None:
+        #    pixelsPerMetric = dB / args["width"]
+                    
         # compute the size of the object
         dimA = dA / pixelsPerMetric
         dimB = dB / pixelsPerMetric
@@ -194,29 +196,32 @@ while True:
         pixelsArea = cv2.contourArea(c)
         pizzaArea = pixelsArea / pow(pixelsPerMetric, 2)
         
-        
+        tamanho = 1
         
         if shape == "Arredondado":  #Trocar de circular para Arredondado
             # compare diameters for prevent a oval shape
             if int(compareDiameter(dA, dB)) <= ERROR_MAX:
                 # find avg diameter and perimeter of equivalent circle from contour and compare    
                 if int(comparePerimeter(dA, dB, c)) <= ERROR_MAX:
-                    if (comparePattern(dimA, dimB, 16) <= ERROR_MAX): # Diametro Pizza Pequena 16
-                        if (compareArea(pizzaArea, 16) <= ERROR_MAX):
+                    if (comparePattern(dimA, dimB, 18) <= ERROR_MAX): # Diametro Pizza Pequena 16
+                        if (compareArea(pizzaArea, 18) <= ERROR_MAX):
+                            tamanho = 18
                             pizza = "Pequena"
                             pizzaSizeNum = 1
                         else: 
                             pizza = "Descartar"
                             pizzaSizeNum = 0
-                    elif (comparePattern(dimA, dimB, 19.5) <= ERROR_MAX): # Diametro Pizza Média 19.5
-                        if(compareArea(pizzaArea, 19.5) <= ERROR_MAX):
+                    elif (comparePattern(dimA, dimB, 22) <= ERROR_MAX): # Diametro Pizza Média 19.5
+                        if(compareArea(pizzaArea, 22) <= ERROR_MAX):
+                            tamanho = 22
                             pizza = "Media"
                             pizzaSizeNum = 2
                         else: 
                             pizza = "Descartar"
                             pizzaSizeNum = 0
-                    elif (comparePattern(dimA, dimB, 26) <= ERROR_MAX): # Diametro Pizza Grande 26
-                        if (compareArea(pizzaArea, 26) <= ERROR_MAX):
+                    elif (comparePattern(dimA, dimB, 30) <= ERROR_MAX): # Diametro Pizza Grande 26
+                        if (compareArea(pizzaArea, 30) <= ERROR_MAX):
+                            tamanho = 30
                             pizza = "Grande"
                             pizzaSizeNum = 3
                         else: 
@@ -228,12 +233,12 @@ while True:
                 else: 
                     pizza = "Descartar"
                     pizzaSizeNum = 0
-            else:
-                pizza = "Descartar"
-                pizzaSizeNum = 0
-        else:
-            pizza = "Descartar"
-            pizzaSizeNum = 0
+            #else:
+                #pizza = "Descartar"
+                #pizzaSizeNum = 0
+        #else:
+            #pizza = "Descartar"
+            #pizzaSizeNum = 0
             
 
         #  Send reply back to client
@@ -246,19 +251,26 @@ while True:
         
         
         # draw the object sizes on the image
-        #cv2.putText(orig, "{:.1f}cm".format(dimA),
-        #    (int(tltrX - 15), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX,
-        #    0.65, (255, 255, 255), 2)
-        #cv2.putText(orig, "{:.1f}cm".format(dimB),
-        #    (int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
-        #    0.65, (255, 255, 255), 2)
+        cv2.putText(orig, "{:.1f}cm".format(dimA),
+            (int(tltrX - 15), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, (255, 255, 255), 2)
+        cv2.putText(orig, "{:.1f}cm".format(dimB),
+            (int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, (255, 255, 255), 2)
         # write size off pizza
-        #cv2.putText(orig, pizza,
-        #    (int(trbrX - 50), int(trbrY + 150)), cv2.FONT_HERSHEY_SIMPLEX,
-        #    0.65, (255, 0, 255), 2)
-        #cv2.putText(orig, str(pizzaArea),
-        #    (int(trbrX - 200), int(trbrY + 200)), cv2.FONT_HERSHEY_SIMPLEX,
-        #    0.65, (255, 255, 255), 2)
+        cv2.putText(orig, pizza,
+            (int(trbrX - 50), int(trbrY + 150)), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, (255, 0, 255), 2)
+        cv2.putText(orig, "PER: " + str(comparePerimeter(dA, dB, c)),
+            (int(trbrX - 200), int(trbrY + 170)), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, (255, 255, 255), 2)
+        cv2.putText(orig, "AR: " + str(compareArea(pizzaArea, tamanho)),
+            (int(trbrX - 200), int(trbrY + 200)), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, (255, 255, 255), 2)
+        cv2.putText(orig, "DIM: " + str(comparePattern(dimA, dimB, tamanho)),
+            (int(trbrX - 200), int(trbrY + 230)), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, (255, 255, 255), 2)
+
         
         
     # show the output image
